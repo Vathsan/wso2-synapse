@@ -41,6 +41,7 @@ import org.apache.synapse.SynapseException;
 import org.apache.synapse.aspects.ComponentType;
 import org.apache.synapse.aspects.flow.statistics.StatisticIdentityGenerator;
 import org.apache.synapse.aspects.flow.statistics.data.artifact.ArtifactHolder;
+import org.apache.synapse.mediators.Value;
 import org.apache.synapse.transport.customlogsetter.CustomLogSetter;
 import org.apache.synapse.aspects.AspectConfigurable;
 import org.apache.synapse.aspects.AspectConfiguration;
@@ -58,6 +59,8 @@ import org.apache.synapse.util.resolver.CustomXmlSchemaURIResolver;
 import org.apache.synapse.util.resolver.ResourceMap;
 import org.apache.synapse.util.resolver.UserDefinedWSDLLocator;
 import org.apache.synapse.util.resolver.UserDefinedXmlSchemaURIResolver;
+import org.apache.synapse.util.xpath.SynapseXPath;
+import org.jaxen.JaxenException;
 import org.xml.sax.InputSource;
 
 import javax.xml.namespace.QName;
@@ -70,6 +73,8 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * <proxy-service name="string" [transports="(http |https |jms )+|all"] [trace="enable|disable"]>
@@ -255,6 +260,14 @@ public class ProxyService implements AspectConfigurable, SynapseArtifact {
 
     private boolean isEdited;
 
+    private SynapseEnvironment synapseEnvironment;
+
+    /**
+     * regex for secure vault expression.
+     */
+    private static final String secureVaultRegex = "\\{wso2:vault-lookup\\('(.*?)'\\)\\}";
+
+
     private AxisService axisService;
 
     /**
@@ -304,6 +317,10 @@ public class ProxyService implements AspectConfigurable, SynapseArtifact {
      */
     public AxisService buildAxisService(SynapseConfiguration synCfg, AxisConfiguration axisCfg) {
 
+        Parameter synapseEnv = axisCfg.getParameter(SynapseConstants.SYNAPSE_ENV);
+        if (synapseEnv != null) {
+            synapseEnvironment = (SynapseEnvironment) synapseEnv.getValue();
+        }
         auditInfo("Building Axis service for Proxy service : " + name);
 
         if (pinnedServers != null && !pinnedServers.isEmpty()) {
@@ -642,7 +659,13 @@ public class ProxyService implements AspectConfigurable, SynapseArtifact {
 
             Parameter p = new Parameter();
             p.setName(name);
-            p.setValue(value);
+
+            if (value instanceof String) {
+                value = resolveSecureVaultExpressions((String) value);
+                p.setValue(value);
+            } else {
+                p.setValue(value);
+            }
 
             try {
                 axisService.addParameter(p);
@@ -1437,5 +1460,28 @@ public class ProxyService implements AspectConfigurable, SynapseArtifact {
 
     public void setCommentsList(List<String> commentsList) {
         this.commentsList = commentsList;
+    }
+
+    private Object resolveSecureVaultExpressions(String value) {
+        Pattern vaultLookupPattern = Pattern.compile(secureVaultRegex);
+        Matcher lookupMatcher = vaultLookupPattern.matcher(value);
+        while (lookupMatcher.find()) {
+            Value expression = null;
+            //getting the expression with out curly brackets
+            String expressionStr = lookupMatcher.group(0).substring(1, lookupMatcher.group(0).length() - 1);
+            try {
+                expression = new Value(new SynapseXPath(expressionStr));
+            } catch (JaxenException e) {
+                log.error("Error while building the expression : " + expressionStr);
+            }
+            if (expression != null) {
+                value = expression.evaluateValue(synapseEnvironment.createMessageContext());
+                if (value == null || value.isEmpty()) {
+                    log.warn("Found Empty value for expression : " + expression.getExpression());
+                    value = "";
+                }
+            }
+        }
+        return value;
     }
 }
