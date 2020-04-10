@@ -18,6 +18,8 @@
 
 package org.apache.synapse.aspects.flow.statistics.data.raw;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.core.SynapseEnvironment;
 
 /**
@@ -25,6 +27,7 @@ import org.apache.synapse.core.SynapseEnvironment;
  */
 public class BasicStatisticDataUnit {
 
+	private static final Log log = LogFactory.getLog(BasicStatisticDataUnit.class);
 	/**
 	 * Time statistic event is reported
 	 */
@@ -68,6 +71,7 @@ public class BasicStatisticDataUnit {
 	}
 
 	public void setTime(Long time) {
+		log.debug("set startTime for BasicStatisticDataUnit " + time);
 		this.time = time;
 	}
 

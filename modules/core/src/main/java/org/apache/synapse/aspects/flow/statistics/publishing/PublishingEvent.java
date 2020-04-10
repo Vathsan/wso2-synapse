@@ -18,6 +18,8 @@
 
 package org.apache.synapse.aspects.flow.statistics.publishing;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.aspects.flow.statistics.data.raw.StatisticsLog;
 
 import java.util.ArrayList;
@@ -26,6 +28,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class PublishingEvent {
+
+	private static Log log = LogFactory.getLog(PublishingEvent.class);
 
 	private String flowId;
 
@@ -64,6 +68,7 @@ public class PublishingEvent {
 		this.startTime = statisticsLog.getStartTime();
 		this.endTime = statisticsLog.getEndTime();
 		this.duration = this.endTime - this.startTime;
+		log.debug("Inside PublishingEvent. \t startTime: " + this.startTime + "endTime: " + this.endTime + "duration: " + this.duration);
 
 		this.contextPropertyMap = extractProperties(statisticsLog.getContextPropertyMap());
 		this.transportPropertyMap = extractProperties(statisticsLog.getTransportPropertyMap());
